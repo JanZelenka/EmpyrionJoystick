@@ -3,17 +3,59 @@
 
 ;  FLIGHT STICK/HOTAS MAPPING SCRIPT FOR EMPYRION - GALACTIC SURVIVAL (v12 tested)
 
-; This is an AutoHotKey script, and requires that (free) application to run
-; Save this code in a text file and give it the extension *.AHK, then double-click it after instaling AutoHotKey
+;--------------------
+class ButtonMap
+{
+	joyInput := ""
+	keyOutput := ""
+	
+	activate ()
+	{
+		Hotkey % this.joyInput, ButtonPressed.Bind( this ) 
+	}
+	
+	deactivate ()
+	{
+		Hotkey % this.joyInput, Off
+	}
+}
 
-applicationname=EmpyrionGalacticFlightStickScript
+;--------------------
+class Profile
+{
+	activate ()
+	{
+	}
+	
+	deactivate ()
+	{
+	}
+	
+	load ( profileSection )
+	{
+		
+	}
+}
 
-; === Edit these vars to set up the script to your liking ===
+settingsFile := "config.ini"
+IniRead, SupressJoystickOutputAwayFromGame, %settingsFile%, Main, TestMode
+IniRead, GameWindowName, %settingsFile%, Main, GameWindowName, "Empyrion - Galactic Survival"
+IniRead, ProfileToggleKey, %settingsFile%, Main, ProfileToggleKey, "-"
+IniRead, activeProfileNumber, %settingsFile%, Main, ActiveProfile, 1
+profiles := []
 
-SupressJoystickOutputAwayFromGame := 0						; 1 for supress, 0 for don't supress (useful for testing)
-GameWindowName := "Empyrion - Galactic Survival"			; Supresses joystick output unless this is the active window
+loop
+{
+	IniRead, iniSection, %settingsFile%, Profile%A_Index%
+	
+	if ( iniSection = "" )
+		break
 
-InputStick := ""												; The ID of your input stick
+	profiles[ A_Index ] := new Profile
+	profiles[ A_Index ].load( "Profile" . A_Index )
+}
+
+activeProfile := profiles[ activeProfileNumber ]
 
 ; Assignments of Axes from joystick inputs
 ;   Options are:
@@ -259,31 +301,14 @@ WatchRoll:
 	return
 	
 ToggleThrottle:
-	if (ThrottleControlEnabled = 1)
-		ThrottleControlEnabled := 0
-	else
-		ThrottleControlEnabled := 1
+	ThrottleControlEnabled := abs( ThrottleControlEnabled - 1 )
 	return
 	
-ToggleProfile:
-	if (CurrentControlProfile = 1)
-	{
-		YawInputAxis := InputStick YawInputAxisProfile2
-		InvertY := PitchInvertedProfile2
-		PitchInputAxis := InputStick PitchInputAxisProfile2							
-		RollInputAxis := InputStick RollInputAxisProfile2							
-		ThrottleInputAxis := InputStick ThrottleInputAxisProfile2
-		CurrentControlProfile := 2
-	}
-	else
-	{
-		YawInputAxis := InputStick YawInputAxisProfile1
-		InvertY := PitchInvertedProfile1
-		PitchInputAxis := InputStick PitchInputAxisProfile1							
-		RollInputAxis := InputStick RollInputAxisProfile1							
-		ThrottleInputAxis := InputStick ThrottleInputAxisProfile1
-		CurrentControlProfile := 1
-	}
+ChangeProfile:
+	activeProfile.deactivate()
+	activeProfileNumber := ( activeProfileNumber = profileCount ? 1 : activeProfileNumber + 1 )
+	activeProfile := profiles[ activeProfileNumber ]
+	activeProfile.activate()
 	return
 	
 WatchThrottle:
@@ -377,15 +402,14 @@ exitWatchThrottle:
 	return
 
 ; Remap buttons, and make up event of buttons fire when button is actually released
-ButtonPressed(btn){
-	global ButtonKeys, InputStick, ButtonStrings, ButtonKeyStrings
-	Send % ButtonKeyStrings[btn].down
+ButtonPressed ( buttonMap ){
+	Send % buttonMap.keyOutput.down
 
-	while( GetKeyState( ButtonStrings[ btn ] ) ) {
+	while( GetKeyState( buttonMap.joyInput ) ) {
 		Sleep 10
 	}
 	
-	Send % ButtonKeyStrings[ btn ].up
+	Send % buttonMap.keyOutput.down
 }
 
 
