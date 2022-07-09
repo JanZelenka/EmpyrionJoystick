@@ -1,7 +1,11 @@
 #SingleInstance force
 #Persistent
 
-;  FLIGHT STICK/HOTAS MAPPING SCRIPT FOR EMPYRION - GALACTIC SURVIVAL (v1.8 tested)
+; FLIGHT STICK/HOTAS MAPPING SCRIPT FOR EMPYRION - GALACTIC SURVIVAL (v1.8 tested)
+; Exception Codes
+; 1000 - Missing mandatory configurations option
+; 1001 - Incorrect Pseudo Axis specification
+
 ;--------------------
 class CAxisMap {
 	inputAxis := ""
@@ -10,14 +14,14 @@ class CAxisMap {
 }
 
 ;--------------------
-class CButtonMapp {
+class CButtonMap {
 	inputJoy := ""
 	outputKey := ""
 
 	__New ( inputJoy := "", outputKey := "" ) {
 		if ( inputJoy != "" ) {
 			onButtonPressed := Func( "onButtonPressed" ).Bind( this )
-			
+
 			if ( SubStr( inputJoy, 1, 3 ) = "POV" )
 				this.inputJoy = CInputHat( inputJoy, onButtonPressed )
 			else
@@ -51,7 +55,7 @@ class CInputAxis {
 		this.correctedInput := this.inputAxis.getState() - 50 * this.hasCenter
 		this.reversing := this.correctedInput < 0
 		this.correctedInput := Abs( this.correctedInput ) - this.deadZone
-		
+
 		if ( this.correctedInput <= 0 )
 			this.correctedInput := 0
 		else {
@@ -60,28 +64,28 @@ class CInputAxis {
 
 			this.correctedInput := this.correctedInput / this.convertedRange
 		}
-		
+
 		this.lastState := this.sensitivityOffset + absoluteThrustPercent * this.sensitivity
 		return this.lastState
 	}
-	
+
 	load( configFileName, sectionName ) {
 		IniRead, this.deadZone, %configFileName%, %sectionName%, DeadZone, 0
 		IniRead, this.hasCenter, %configFileName%, %sectionName%, HasCenter, 0
 		IniRead, inputAxis, %configFileName%, %sectionName%, JoystickAxis
-		
+
 		if ( inputAxis = "ERROR" )
-			throw Exception( 1000, "Section: " . sectionName . "`nKey: JoystickAxis"
+			throw Exception( 1000, "Section: " . sectionName . "`nKey: JoystickAxis" )
 		else if ( ! InStr( inputAxis, "," ) )
 			this.inputAxis := new CRealAxis( inputAxis )
 		else
 			this.inputAxis := new CPseudoAxis( inputAxis )
-		
+
 		IniRead, this.maxZone, %configFileName%, %sectionName%, MaxZone, 0
 		IniRead, this.sensitivity, %configFileName%, %sectionName%, SensitivityPercent, 100
-		this.sensitivity /= 100 
+		this.sensitivity /= 100
 		IniRead, this.sensitivityOffset, %configFileName%, %sectionName%, SensitivityOffsetPercent, 0
-		this.sensitivityOffset /= 100 
+		this.sensitivityOffset /= 100
 
 		this.convertedRange := 100 - 50 * this.hasCenter - this.deadZone - this.maxZone
 	}
@@ -119,12 +123,12 @@ class COutputKey {
 
 	press () {
 		Send % this.keySendString.down
-		this.pressed = true
+		this.pressed := true
 	}
 
 	release () {
 		Send % this.keySendString.up
-		this.pressed = false
+		this.pressed := false
 	}
 }
 
@@ -174,7 +178,7 @@ class CRealAxis {
 	__New ( inputJoy ) {
 		this.inputJoy := inputJoy
 	}
-	
+
 	getState () {
 		return GetKeyState % this.joyInput
 	}
@@ -185,7 +189,15 @@ class CPseudoAxis {
 	inputJoy1 := ""
 	inputJoy2 := ""
 
-	__New (
+	__New ( inputString ) {
+		if ( ! InStr( inputString, "," ) )
+			throw Exception( 1001, "Pseudo axis definition: " . inputString, "This is not a valid pseudo-axis input definition" )
+
+		Loop, Parse, inputString, `, {
+			this.inputJoy%A_Index% := new
+		}
+	}
+
 	activate () {
 		inputJoy1.activate()
 		inputJoy2.activate()
