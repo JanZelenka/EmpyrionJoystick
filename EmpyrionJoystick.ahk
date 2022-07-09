@@ -1,61 +1,320 @@
 #SingleInstance force
 #Persistent
 
-;  FLIGHT STICK/HOTAS MAPPING SCRIPT FOR EMPYRION - GALACTIC SURVIVAL (v12 tested)
+;  FLIGHT STICK/HOTAS MAPPING SCRIPT FOR EMPYRION - GALACTIC SURVIVAL (v1.8 tested)
+;--------------------
+class CAxisMap {
+	inputAxis := ""
+	outputKey1 := ""
+	outputKey2 := ""
+}
 
 ;--------------------
-class ButtonMap
-{
-	joyInput := ""
-	keyOutput := ""
-	
-	activate ()
-	{
-		Hotkey % this.joyInput, ButtonPressed.Bind( this ) 
+class CButtonMapp {
+	inputJoy := ""
+	outputKey := ""
+
+	__New ( inputJoy := "", outputKey := "" ) {
+		if ( inputJoy != "" ) {
+			onButtonPressed := Func( "onButtonPressed" ).Bind( this )
+			
+			if ( SubStr( inputJoy, 1, 3 ) = "POV" )
+				this.inputJoy = CInputHat( inputJoy, onButtonPressed )
+			else
+				this.inputJoy = CInputButton( inputJoy, onButtonPressed )
+		}
 	}
-	
-	deactivate ()
-	{
-		Hotkey % this.joyInput, Off
+
+	activate () {
+		this.inputJoy.activate()
+	}
+
+	deactivate () {
+		this.inputJoy.deactivate()
 	}
 }
 
 ;--------------------
-class Profile
-{
-	activate ()
-	{
-	}
-	
-	deactivate ()
-	{
-	}
-	
-	load ( profileSection )
-	{
+class CInputAxis {
+	convertedRange := 0
+	correctedInput := 0
+	deadZone := 0
+	hasCenter := 0
+	inputAxis := ""
+	lastState := 0
+	maxZone := 0
+	reversing := 0
+	sensitivity := 1
+	sensitivityOffset := 0
+
+	getState () {
+		this.correctedInput := this.inputAxis.getState() - 50 * this.hasCenter
+		this.reversing := this.correctedInput < 0
+		this.correctedInput := Abs( this.correctedInput ) - this.deadZone
 		
+		if ( this.correctedInput <= 0 )
+			this.correctedInput := 0
+		else {
+			if ( this.correctedInput > this.convertedRange )
+				this.correctedInput := this.convertedRange
+
+			this.correctedInput := this.correctedInput / this.convertedRange
+		}
+		
+		this.lastState := this.sensitivityOffset + absoluteThrustPercent * this.sensitivity
+		return this.lastState
+	}
+	
+	load( configFileName, sectionName ) {
+		IniRead, this.deadZone, %configFileName%, %sectionName%, DeadZone, 0
+		IniRead, this.hasCenter, %configFileName%, %sectionName%, HasCenter, 0
+		IniRead, inputAxis, %configFileName%, %sectionName%, JoystickAxis
+		
+		if ( inputAxis = "ERROR" )
+			throw Exception( 1000, "Section: " . sectionName . "`nKey: JoystickAxis"
+		else if ( ! InStr( inputAxis, "," ) )
+			this.inputAxis := new CRealAxis( inputAxis )
+		else
+			this.inputAxis := new CPseudoAxis( inputAxis )
+		
+		IniRead, this.maxZone, %configFileName%, %sectionName%, MaxZone, 0
+		IniRead, this.sensitivity, %configFileName%, %sectionName%, SensitivityPercent, 100
+		this.sensitivity /= 100 
+		IniRead, this.sensitivityOffset, %configFileName%, %sectionName%, SensitivityOffsetPercent, 0
+		this.sensitivityOffset /= 100 
+
+		this.convertedRange := 100 - 50 * this.hasCenter - this.deadZone - this.maxZone
+	}
+}
+
+;--------------------
+class CInputButton extends CPressableInput {
+
+	activate () {
+		Hotkey % this.inputJoy, this.onButtonPressed
+		active := true
+	}
+
+	deactivate () {
+		Hotkey % this.inputJoy, Off
+		active := false
+	}
+}
+
+;--------------------
+class CInputHat extends CPressableInput {
+	activate () {
+		active := true
+	}
+
+	deactivate () {
+		active := false
+	}
+}
+
+;--------------------
+class COutputKey {
+	keySendString := ""
+	pressed := false
+
+	press () {
+		Send % this.keySendString.down
+		this.pressed = true
+	}
+
+	release () {
+		Send % this.keySendString.up
+		this.pressed = false
+	}
+}
+
+;--------------------
+class CPressableInput {
+	active := false
+	currentState := false
+	inputJoy := ""
+	onButtonPressed := ""
+
+	__New ( inputJoy := "" , onButtonPressed := "" ) {
+		this.onButtonPressed := onButtonPressed
+	}
+
+	getState () {
+		return this.currentState
+	}
+}
+
+;--------------------
+class CPseudoAxisButton {
+	currentState := false
+	inputJoy := ""
+	pseudoAxis := ""
+
+	__Delete () {
+		this.pseudoAxis := ""
+	}
+
+	activate () {
+		Hotkey % this.inputJoy, Func( "onPseudoAxisInput" ).Bind( this )
+	}
+
+	deactivate () {
+		Hotkey % this.inputJoy, Off
+	}
+
+	getState () {
+		return this.currentState
+	}
+}
+
+;--------------------
+class CRealAxis {
+	inputJoy := ""
+
+	__New ( inputJoy ) {
+		this.inputJoy := inputJoy
+	}
+	
+	getState () {
+		return GetKeyState % this.joyInput
+	}
+}
+
+;--------------------
+class CPseudoAxis {
+	inputJoy1 := ""
+	inputJoy2 := ""
+
+	__New (
+	activate () {
+		inputJoy1.activate()
+		inputJoy2.activate()
+	}
+
+	deactivate () {
+		inputJoy1.deactivate()
+		inputJoy2.deactivate()
+	}
+
+	getState () {
+		return this.currentState
+	}
+}
+
+;--------------------
+class CProfile {
+	buttonMappings := []
+	pitchAxis := ""
+	yawAxis := ""
+
+	__New ( settingsFile, profileSection ) {
+		this.load( settingsFile, profileSection )
+	}
+
+	activate () {
+		For buttonIndex, buttonMapping in buttonMappings
+			buttonMapping.activate()
+	}
+
+	deactivate () {
+		For buttonIndex, buttonMapping in buttonMappings
+			buttonMapping.deactivate()
+	}
+
+	load ( configFileName, sectionName ) {
+		IniRead, pitchAxisSection, %configFileName%, %sectionName%, PitchAxis
+
+		if ( pitchAxisSection = "ERROR" )
+			throw Exception( 1000, "Section: " . sectionName . "`nKey: PitchAxis"
+
+		this.pitchAxis := new CRealAxis()
+		this.pitchAxis.load( pitchAxisSection )
+		IniRead, yawInputAxisSection, %configFileName%, %sectionName%, YawAxis
+
+		if ( yawInputAxisSection = "ERROR" )
+			throw Exception( 1000, "Section: " . sectionName . "`nKey: YawAxis"
+
 	}
 }
 
 settingsFile := "config.ini"
-IniRead, SupressJoystickOutputAwayFromGame, %settingsFile%, Main, TestMode
-IniRead, GameWindowName, %settingsFile%, Main, GameWindowName, "Empyrion - Galactic Survival"
-IniRead, ProfileToggleKey, %settingsFile%, Main, ProfileToggleKey, "-"
+IniRead, testMode, %settingsFile%, Main, TestMode
+IniRead, gameWindowName, %settingsFile%, Empyrion, WindowName, "Empyrion - Galactic Survival"
+IniRead, profileToggleKey, %settingsFile%, Main, ProfileToggleKey, "-"
 IniRead, activeProfileNumber, %settingsFile%, Main, ActiveProfile, 1
 profiles := []
 
-loop
-{
+
+loop {
 	IniRead, iniSection, %settingsFile%, Profile%A_Index%
-	
+
 	if ( iniSection = "" )
 		break
 
-	profiles[ A_Index ] := new Profile
-	profiles[ A_Index ].load( "Profile" . A_Index )
+	profileCount := A_Index
+
+	try
+		profiles[ profileCount ] := new Profile( settingsFile, "Profile" . profileCount )
+	catch e {
+		if ( e.Message = 1000 )
+			MsgBox,,Script startup, % "Error in the config file`n" . e.What . "`n" . e.Extra
+		else
+			throw e
+
+		ExitApp % e.Message
+	}
 }
 
 activeProfile := profiles[ activeProfileNumber ]
+activeProfile.activate()
+
+HotKey % profileToggleKey, activateNextProfile
+return
+
+;--------------------
+activateNextProfile:
+	if ( scriptDisabled() )
+		return
+
+	if ( profileCount = 1 )
+		return
+
+	activeProfile.deactivate()
+
+	if ( ++activeProfileNumber > profileCount )
+		activeProfileNumber := 1
+
+	activeProfile := profiles[ activeProfileNumber ]
+	activeProfile.activate()
+	return
+
+;--------------------
+scriptDisabled () {
+	return !WinActive( gameWindowName ) && testMode = 1
+}
+
+;--------------------
+; Triggered by a Joystick button, presses the mapped key and waits for the Joystick button to get released.
+; Then the pressed key is released as well.
+onButtonPressed ( buttonMapping ) {
+	if ( scriptDisabled() )
+		return
+
+	buttonMapping.outputKey.press
+
+	while( buttonMapping.getState() ) ) {
+		Sleep 10
+	}
+
+	buttonMapping.outputKey.release
+}
+
+;--------------------
+onPseudoAxisInput ( pseudoAxis ) {
+	if ( scriptDisabled() )
+		return
+
+}
 
 ; Assignments of Axes from joystick inputs
 ;   Options are:
@@ -65,34 +324,34 @@ activeProfile := profiles[ activeProfileNumber ]
 ;		Joystick Throttle Axis: 	JoyZ
 
 ; Profile 1
-YawInputAxisProfile1 := "1JoyR"									
-PitchInputAxisProfile1 := "3JoyY"								
-RollInputAxisProfile1 := "3JoyX"										
-ThrottleInputAxisProfile1 := "2JoyZ"									
+YawInputAxisProfile1 := "1JoyR"
+PitchInputAxisProfile1 := "3JoyY"
+RollInputAxisProfile1 := "3JoyX"
+ThrottleInputAxisProfile1 := "2JoyZ"
 PitchInvertedProfile1 := 0
 
 
 ; Profile 2  currently set up to switch roll and yaw (leaning stick side to side turns instead of rolls) and does not invert the joystick
-YawInputAxisProfile2 := "3JoyX"								
-PitchInputAxisProfile2 := "3JoyY"							
-RollInputAxisProfile2 := "1JoyR"								
+YawInputAxisProfile2 := "3JoyX"
+PitchInputAxisProfile2 := "3JoyY"
+RollInputAxisProfile2 := "1JoyR"
 ThrottleInputAxisProfile2 := "2JoyZ"
 PitchInvertedProfile2 := 0
 
 ; Button That Switches Between Profile 1 and Profile 2 Axis Assignments
-ProfileToggleKey := "-"										
+profileToggleKey := "-"
 
 
 ; Dead Zone adjustments (prevents drift when an analog axis is centered but still sending a tiny signal)
-PitchDeadZone := 15											; Percentage of deadzones per axis 
+PitchDeadZone := 15											; Percentage of deadzones per axis
 RollDeadZone := 15
 YawDeadZone := 20
 ThrottleDeadZone := 20
 
 ; Sensitivity Adjustments.  Use 0.1 to 2 or so. will depend on your preferred mouse sensitivity in-game.
-RollSensitivity := 0.2										
+RollSensitivity := 0.2
 PitchSensitivity := 0.2
-YawSensitivity := 0.2										
+YawSensitivity := 0.2
 
 RollAxisOutputKeys := ["q", "e"]							; Array of keys to map to the Roll Axis
 ThrottleOutputKeys := ["w", "s"]							; Array of keys to map to the Throttle axis
@@ -100,8 +359,8 @@ ThrottleOutputKeys := ["w", "s"]							; Array of keys to map to the Throttle ax
 ; Assign a button that turns the thrust control on and off in-game
 ThrottleControlDisableEnableKey := "2Joy1"					; Assign a button or key that will enable/disable the throttle control in-game (makes the analog control more friendly - you don't have to center it to use menus or switch windows)
 															; If you Assign a Joystick Button Here, put the number of the joystick, then "Joy", then the button number: 1Joy9 for Joystick 1 button 9 (joystick 1 is default)
-															
-; Set this to 0 to disable throttle function entirely															
+
+; Set this to 0 to disable throttle function entirely
 EnableThrottleBinding := 1									; Throttle works well, but can't work when in menus and will prevent Alt+Tab to switch apps in windows... (due to empyrion limitations)
 
 HatKeysX := ["a","d"]										; Array of keys to map to the POV hat X axis
@@ -110,33 +369,33 @@ HatKeysY := ["space","c"]									; Array of keys to map to the POV hat Y axis
 						; NOTES ON HOW TO CHANGE KEYBINDINGS:
 buttonKeys := []
 buttonKeys[ 1 ] := { joyNr: 3, buttonNr: 1, output: "LButton" }			; 	LButton, MButton, RButton are the middle, left, and right mouse buttons
-buttonKeys[ 2 ] := { joyNr: 3, buttonNr: 2, output: "o" }				; 	enter lowercase letters or numbers in the quotes for binds 
+buttonKeys[ 2 ] := { joyNr: 3, buttonNr: 2, output: "o" }				; 	enter lowercase letters or numbers in the quotes for binds
 buttonKeys[ 3 ] := { joyNr: 2, buttonNr: 4, output: "Space" }			; 	Space, Tab, Enter, Escape, LShift, RShift, LAlt, RAlt, LControl, RControl, F1, F2, ...,  are other common keynames for keys
-buttonKeys[ 4 ] := { joyNr: 2, buttonNr: 5, output: "c" }				; 	use a carat before a key to bind a control+keypress:   	^p 	would bind Ctrl+p 
-buttonKeys[ 5 ] := { joyNr: 2, buttonNr: 3, output: "y" }				;   use a plus before a key to bind a Shift+keypress:   	+p 	would bind Shift+p 
-buttonKeys[ 6 ] := { joyNr: 3, buttonNr: 4, output: "r" }				;   use an exclamation mark before a key for Alt+keypress:	!p	would bind Alt+p 
+buttonKeys[ 4 ] := { joyNr: 2, buttonNr: 5, output: "c" }				; 	use a carat before a key to bind a control+keypress:   	^p 	would bind Ctrl+p
+buttonKeys[ 5 ] := { joyNr: 2, buttonNr: 3, output: "y" }				;   use a plus before a key to bind a Shift+keypress:   	+p 	would bind Shift+p
+buttonKeys[ 6 ] := { joyNr: 3, buttonNr: 4, output: "r" }				;   use an exclamation mark before a key for Alt+keypress:	!p	would bind Alt+p
 
 																		; For more info on what to put in for keys, visit: https://www.autohotkey.com/docs/KeyList.htm
 
-; These adjust how long the pulse interval is for analog conversions of Yaw and Thrust.  Leave alone unless you're tinkering with the performance of this function 
+; These adjust how long the pulse interval is for analog conversions of Yaw and Thrust.  Leave alone unless you're tinkering with the performance of this function
 AxisSendModulationTimeZ := 50                              	; total time of keypress pulse loops for Roll (the key will be pressed down a fraction of this time depending on analog input
-AxisSendModulationTimeT := 50                       		; total time of keypress pulse loops for Thrust (the key will be pressed down a fraction of this time depending on analog input						
+AxisSendModulationTimeT := 50                       		; total time of keypress pulse loops for Thrust (the key will be pressed down a fraction of this time depending on analog input
 minimumSendDurationRatioT := 0.40 							; Minimum ratio of full that Throttle starts on (lower values weren't working in empyrion, glitching)
-															
+
 ;====== End vars intended to be modified =======
 
 throttleKeyPressTime := 100 ; Number of ms the throttle key will be held down. The rate is achieved by modifying the release time only.
 throttleMaxZone := 5 ; The percentage of the Throttle axis that is treated as full throttle. So when the value is say 5, above 95% and below 5% will be treated as full throttle in the respective dirrection.
 
-InvertY := PitchInvertedProfile1							; assigning profile 1 bindings do not change these 					
+InvertY := PitchInvertedProfile1							; assigning profile 1 bindings do not change these
 YawInputAxis := InputStick YawInputAxisProfile1
-PitchInputAxis := InputStick PitchInputAxisProfile1							
-RollInputAxis := InputStick RollInputAxisProfile1							
+PitchInputAxis := InputStick PitchInputAxisProfile1
+RollInputAxis := InputStick RollInputAxisProfile1
 ThrottleInputAxis := InputStick ThrottleInputAxisProfile1
 
 Hotkey, %ThrottleControlDisableEnableKey%, ToggleThrottle	; linking hotkey to function for this binding
-Hotkey, %ProfileToggleKey%, ToggleProfile					; linking hotkey to function for this binding
-ThrottleControlEnabled := 1   	; tracks whether user has disabled or enabled throttle control 
+Hotkey, %profileToggleKey%, ToggleProfile					; linking hotkey to function for this binding
+ThrottleControlEnabled := 1   	; tracks whether user has disabled or enabled throttle control
 CurrentControlProfile := 1   	; tracks whether user is currently on control Profile 1 or 2 (don't change this)
 ThrottleKeyState := 0   		; internal program use
 RollKeyState := 0				; internal program use
@@ -191,11 +450,11 @@ SetTimer, WatchTwoAxesForMouseOutput, 5
 SetTimer, WatchRoll, 5
 if (EnableThrottleBinding = 1)
 	SetTimer, WatchThrottle, 10
-	
+
 return
 
 WatchHat:
-	if (!WinActive(GameWindowName) && SupressJoystickOutputAwayFromGame = 1)
+	if (!WinActive(gameWindowName) && testMode = 1)
 		return
 
 	; === Hat ===
@@ -214,19 +473,19 @@ WatchHat:
 			HatState[A_Index] := new_state
 		}
 	}
-	
+
 	return
-	
-	
+
+
 WatchTwoAxesForMouseOutput:
-	if (!WinActive(GameWindowName) && SupressJoystickOutputAwayFromGame = 1)
+	if (!WinActive(gameWindowName) && testMode = 1)
 		return
 
 	mouseAxisX := GetKeyState(YawInputAxis)-50  ; Get position of axis assigned for X, centered.
 	MouseAxisY := GetKeyState(PitchInputAxis)-50  ; Get position of axis assigned for Y, centered.
 
 	if (abs(mouseAxisX) > YawDeadZone || abs(MouseAxisY) > PitchDeadZone)
-	{   
+	{
 
 		if (InvertY = 1)
 			MouseAxisY := -1 * MouseAxisY
@@ -238,108 +497,108 @@ WatchTwoAxesForMouseOutput:
 			mouseAxisX := (mouseAxisX + YawDeadZone) * 50 / (50-YawDeadZone)
 		else
 			mouseAxisX := 0
-		
+
 		if (MouseAxisY > PitchDeadZone)
 			MouseAxisY := (MouseAxisY - PitchDeadZone) * 50 / (50-PitchDeadZone)
 		else if (MouseAxisY < 0 - PitchDeadZone)
 			MouseAxisY := (MouseAxisY + PitchDeadZone) * 50 / (50-PitchDeadZone)
 		else
 			MouseAxisY := 0
-			
+
 		DllCall("mouse_event", uint, 1, int, mouseAxisX * YawSensitivity, int, MouseAxisY * PitchSensitivity)
 	}
 
 	return
-	
+
 WatchRoll:
 	KeyToHoldDownRollR := RollAxisOutputKeys[2]
 	KeyToHoldDownRollL := RollAxisOutputKeys[1]
-	if (!WinActive(GameWindowName) && SupressJoystickOutputAwayFromGame = 1)
+	if (!WinActive(gameWindowName) && testMode = 1)
 	{
 		if (RollKeyState = 1)
 		{
 			Send, {%KeyToHoldDownRollR% up}
-			Send, {%KeyToHoldDownRollL% up}	
+			Send, {%KeyToHoldDownRollL% up}
 			RollKeyState := 0
 		}
 		return
 	}
-		
+
 	RollAxis := GetKeyState(RollInputAxis)  ; Get position of assigned roll axis.
-	
+
 	if (RollAxis > 50 + RollDeadZone)
-		KeyToHoldDownRoll := RollAxisOutputKeys[2]			
+		KeyToHoldDownRoll := RollAxisOutputKeys[2]
 	else if (RollAxis < 50 - RollDeadZone)
 		KeyToHoldDownRoll := RollAxisOutputKeys[1]
 	else
-	{	
+	{
 		if (RollKeyState = 1)
 		{
 			Send, {%KeyToHoldDownRollR% up}
-			Send, {%KeyToHoldDownRollL% up}	
+			Send, {%KeyToHoldDownRollL% up}
 			RollKeyState := 0
 		}
 		return
 	}
-	
-	if (RollAxis > 90 || RollAxis <10)  ; just holds key down when at max versus pulsing it 
+
+	if (RollAxis > 90 || RollAxis <10)  ; just holds key down when at max versus pulsing it
 	{
 		RollKeyState := 1
-		Send, {%KeyToHoldDownRoll% down}	
+		Send, {%KeyToHoldDownRoll% down}
 		return
 	}
 
 	possibleZ := 50 - RollDeadZone
 	rawAmountZ := abs(RollAxis - 50) ; Range is now -50 to +50
 	correctedAmountZ := rawAmountZ - RollDeadZone
-	
+
 	Send, {%KeyToHoldDownRoll% down}  ; Press it down.
 	Sleep, (correctedAmountZ/possibleZ) * AxisSendModulationTimeZ * RollSensitivity
 	Send, {%KeyToHoldDownRoll% up}  ; Release it.
 	Sleep, (1- correctedAmountZ/possibleZ) * AxisSendModulationTimeZ * RollSensitivity
 
 	return
-	
+
 ToggleThrottle:
 	ThrottleControlEnabled := abs( ThrottleControlEnabled - 1 )
 	return
-	
+
 ChangeProfile:
 	activeProfile.deactivate()
 	activeProfileNumber := ( activeProfileNumber = profileCount ? 1 : activeProfileNumber + 1 )
 	activeProfile := profiles[ activeProfileNumber ]
 	activeProfile.activate()
 	return
-	
+
 WatchThrottle:
 	ThrottleUpKey := ThrottleOutputKeys[2]
 	ThrottleDownKey := ThrottleOutputKeys[1]
-	if ((!WinActive(GameWindowName) && SupressJoystickOutputAwayFromGame = 1) || (!ThrottleControlEnabled))
-	{	
+	if ((!WinActive(gameWindowName) && testMode = 1) || (!ThrottleControlEnabled))
+	{
 		if (ThrottleKeyState = 1)
 		{
 			Send, {%ThrottleUpKey% up}
-			Send, {%ThrottleDownKey% up}	
+			Send, {%ThrottleDownKey% up}
 			ThrottleKeyState := 0
 		}
-		
+
 		throttleToggledOn := A_TickCount
 		lastThrottleInput := 50
 		return
 	}
 
 	ThrottleAxis := GetKeyState( ThrottleInputAxis ) - 50  ; Get position of Throttle axis.
-	
-	if ( ThrottleAxis > ThrottleDeadZone)
+
+	if ( ThrottleAxis > ThrottleDeadZone )
 		KeyToHoldDownT := ThrottleUpKey
-	else if ( ThrottleAxis < -ThrottleDeadZone)
+	else if ( ThrottleAxis < -ThrottleDeadZone )
 		KeyToHoldDownT := ThrottleDownKey
 	else
 	{
 		if (ThrottleKeyState = 1)
 		{
 			Send, {%ThrottleUpKey% up}
-			Send, {%ThrottleDownKey% up}	
+			Send, {%ThrottleDownKey% up}
 			ThrottleKeyState := 0
 		}
 
@@ -347,7 +606,7 @@ WatchThrottle:
 		GoTo, exitWatchThrottle
 	}
 
-	if ( ThrottleAxis > throttleFullForward || ThrottleAxis < throttleFullBackward ) 
+	if ( ThrottleAxis < throttleFullForward || ThrottleAxis > throttleFullBackward )
 	{
 		if ( ThrottleKeyState = 0 )
 		{
@@ -359,16 +618,21 @@ WatchThrottle:
 		GoTo, exitWatchThrottle
 	}
 
-	throttleToggledBefore := A_TickCount - throttleToggledOn
 	absoluteThrottleInput := abs( ThrottleAxis )
 	absoluteCorrectedInput := absoluteThrottleInput - ThrottleDeadZone
-	absoluteThrustPercent := absoluteCorrectedInput / ( 50 - ThrottleDeadZone - throttleMaxZone ) ;
-	throttleDelta := absoluteThrottleInput - abs ( lastThrottleInput )
-	
+	thrustRange := 50 - ThrottleDeadZone - throttleMaxZone
+
+	if ( absoluteCorrectedInput > thrustRange )
+		absoluteCorrectedInput := thrustRange
+
+	absoluteThrustPercent := absoluteCorrectedInput / thrustRange
+;	throttleDelta := absoluteThrottleInput - abs ( lastThrottleInput )
+	throttleToggledBefore := A_TickCount - throttleToggledOn
+
 	if ( ThrottleKeyState = 1 )
 	{
 		keyDownTime := timeLeftOver + ( throttleKeyPressTime * absoluteThrustPercent )
-		
+
 		if ( keyDownTime <= throttleToggledBefore ) ;The throttle has been pressed long enough, releasing the key.
 		{
 			Send, {%KeyToHoldDownT% up}
@@ -378,13 +642,13 @@ WatchThrottle:
 			GoTo, exitWatchThrottle
 		}
 	} else {
-		
+
 		if ( absoluteCorrectedInput <= 0 )
 			GoTo, exitWatchThrottle
 		else
 		{
 			keyUpTime := timeLeftOver + ( throttleKeyPressTime * ( 1 - absoluteThrustPercent ) )
-			
+
 			if ( keyUpTime <= throttleToggledBefore )
 			{
 				Send, {%KeyToHoldDownT% down}
@@ -397,20 +661,9 @@ WatchThrottle:
 	}
 
 exitWatchThrottle:
-;	ToolTip, Thrust: %absoluteThrustPercent%`nKey down time: %keyDownTime%`nKey up time: %keyUpTime%`n
-	lastThrottleInput := ThrottleAxis
+	ToolTip, Throttle: %ThrottleAxis%`nAbsolute thrust: %absoluteThrustPercent%
+;	lastThrottleInput := ThrottleAxis
 	return
-
-; Remap buttons, and make up event of buttons fire when button is actually released
-ButtonPressed ( buttonMap ){
-	Send % buttonMap.keyOutput.down
-
-	while( GetKeyState( buttonMap.joyInput ) ) {
-		Sleep 10
-	}
-	
-	Send % buttonMap.keyOutput.down
-}
 
 
 
