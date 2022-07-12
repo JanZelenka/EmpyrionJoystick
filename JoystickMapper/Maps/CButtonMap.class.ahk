@@ -7,18 +7,15 @@ class CButtonMap {
 
 	; BUILT IN METHODS
 	onButtonPressed() {
-		MsgBox % "Called"
-/*		
 		if ( scriptDisabled() )
 			return
 
-		this.outputKey.press
+		this.outputKey.press()
 
 		while( this.inputJoy.getState() )
 			Sleep 10
 
-		this.outputKey.release
-*/
+		this.outputKey.release()
 		}
 
 	; CUSTOM METHODS

@@ -8,9 +8,8 @@ class CInputButton extends CPressableInput {
 
 	; CUSTOM METHODS
 	activate() {
-		this.onButtonPressed.Call()
-		HotKey, 3Joy1, % this.onButtonPressed
-;		HotKey, % this.inputString, % this.onButtonPressed
+		onButtonPressed := this.onButtonPressed
+		HotKey, % this.inputString, % onButtonPressed
 		active := true
 		}
 

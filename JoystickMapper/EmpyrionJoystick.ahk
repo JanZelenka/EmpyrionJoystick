@@ -11,7 +11,7 @@
 
 ;--------------------
 scriptDisabled() {
-	return ! WinActive( gameWindowName ) && ! testMode
+	return ! WinActive( gameWindowName ) && testMode
 }
 
 settingsFile := A_ScriptDir . "\config.ini"
