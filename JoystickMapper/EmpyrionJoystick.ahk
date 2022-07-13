@@ -9,11 +9,6 @@
 #Include %A_ScriptDir%\CProfile.class.ahk
 #Include %A_ScriptDir%\Watchers\CHatWatcher.class.ahk
 
-;--------------------
-scriptDisabled() {
-	return ! WinActive( gameWindowName ) && testMode
-}
-
 settingsFile := A_ScriptDir . "\config.ini"
 IniRead, testMode, %settingsFile%, Main, TestMode
 IniRead, gameWindowName, %settingsFile%, Empyrion, WindowName, "Empyrion - Galactic Survival"
@@ -64,6 +59,11 @@ activateNextProfile:
 	activeProfile := profiles[ activeProfileNumber ]
 	activeProfile.activate()
 	return
+
+;--------------------
+scriptDisabled() {
+	return ! WinActive( gameWindowName ) && testMode
+	}
 
 ; Assignments of Axes from joystick inputs
 ;   Options are:

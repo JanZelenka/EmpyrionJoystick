@@ -5,20 +5,6 @@ class CButtonMap {
 	inputJoy := {}
 	outputKey := {}
 
-	; BUILT IN METHODS
-	onButtonPressed() {
-		if ( scriptDisabled() )
-			return
-
-		this.outputKey.press()
-
-		while( this.inputJoy.getState() )
-			Sleep 10
-
-		this.outputKey.release()
-		}
-
-	; CUSTOM METHODS
 	activate() {
 		this.inputJoy.activate()
 		}
@@ -35,7 +21,8 @@ class CButtonMap {
 
 		if ( inputString != "" ) {
 			onButtonPressed := ObjBindMethod( this, "onButtonPressed" )
-			this.inputJoy := New CPressableInput( inputString, onButtonPressed )
+			onButtonReleased := ObjBindMethod( this, "onButtonReleased" )
+			this.inputJoy := New CPressableInput( inputString, onButtonPressed, onButtonReleased )
 			}
 
 		IniRead, outputString, %configFileName%, %sectionName%, Output
@@ -44,5 +31,21 @@ class CButtonMap {
 			throw Exception( 1000, "Section: " . sectionName . "`nKey: Output" )
 
 		this.outputKey := New COutputKey( outputString )
+		}
+
+	onButtonPressed() {
+		if ( scriptDisabled() )
+			return
+
+		this.outputKey.press()
+		tooltip pressed
+		}
+		
+	onButtonReleased() {
+		if ( scriptDisabled() )
+			return
+
+		this.outputKey.release()
+		tooltip released
 		}
 	}

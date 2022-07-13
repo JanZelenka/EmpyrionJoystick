@@ -3,19 +3,25 @@
 class CInputHat extends CPressableInput {
 	pressed := false
 
-	__New() {
+	__New( inputString ) {
 		this.inputString := inputString
 		}
 
 	activate() {
-		active := true
+		Global hatWatcher
+		
+		hatWatcher.addHatButton( this )
+		this.active := true
 		}
 
 	deactivate() {
-		active := false
+		Global hatWatcher
+		
+		hatWatcher.removeHatButton( this )
+		this.active := false
 		}
 
 	getState() {
-		return pressed
+		return this.pressed
 		}
 	}

@@ -35,6 +35,6 @@ class CProfile {
 
 			this.buttonMaps.Push( New CButtonMap() )
 			this.buttonMaps[ A_Index ].load( configFileName, buttonSection )
+			}
 		}
 	}
-

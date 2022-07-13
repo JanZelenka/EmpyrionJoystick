@@ -24,7 +24,7 @@ class CAxisMap {
 			this.correctedInput := this.correctedInput / this.convertedRange
 			}
 
-		this.lastState := this.sensitivityOffset + absoluteThrustPercent * this.sensitivity
+		this.lastState := this.sensitivityOffset + this.absoluteThrustPercent * this.sensitivity
 		return this.lastState
 		}
 
