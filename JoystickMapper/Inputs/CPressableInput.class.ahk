@@ -9,13 +9,13 @@ class CPressableInput extends CInput {
 
 	;BUILT IN METHODS
 	__New( inputString , onButtonPressed, onButtonReleased ) {
-		if ( InStr( inputString, "Hat" ) )
+		If ( InStr( inputString, "Hat" ) )
 			result := New CInputHat( inputString )
-		else
+		Else
 			result := New CInputButton( inputString )
 
 		result.onButtonPressed := onButtonPressed
 		result.onButtonReleased := onButtonReleased
-		return result
+		Return result
 		}
 	}

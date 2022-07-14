@@ -1,5 +1,5 @@
 #Include %A_ScriptDir%\Inputs\CPressableInput.class.ahk
-#Include %A_ScriptDir%\Outputs\COutputKey.class.ahk
+#Include %A_ScriptDir%\Outputs\COutput.class.ahk
 
 class CButtonMap {
 	inputJoy := {}
@@ -30,7 +30,7 @@ class CButtonMap {
 		if ( outputString = "ERROR" )
 			throw Exception( 1000, "Section: " . sectionName . "`nKey: Output" )
 
-		this.outputKey := New COutputKey( outputString )
+		this.outputKey := New COutput( outputString )
 		}
 
 	onButtonPressed() {
@@ -38,14 +38,12 @@ class CButtonMap {
 			return
 
 		this.outputKey.press()
-		tooltip pressed
 		}
-		
+
 	onButtonReleased() {
 		if ( scriptDisabled() )
 			return
 
 		this.outputKey.release()
-		tooltip released
 		}
 	}

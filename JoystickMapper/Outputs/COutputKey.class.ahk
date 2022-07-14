@@ -1,14 +1,14 @@
-class COutputKey {
-	outputString := ""
+#Include %A_ScriptDir%\Outputs\COutput.class.ahk
+
+class COutputKey Extends COutput {
 	pressed := false
 	pressString := ""
 	releaseString := ""
 
 	;BUILT IN METHODS
 	__New( outputString ) {
-		this.outputString := outputString
-		this.pressString := "{" . this.outputString . " down}"
-		this.releaseString := "{" . this.outputString . " up}"
+		this.pressString := "{" . outputString . " down}"
+		this.releaseString := "{" . outputString . " up}"
 		}
 
 	; CUSTOM METHODS
