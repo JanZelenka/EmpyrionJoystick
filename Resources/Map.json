@@ -1,0 +1,9 @@
+{
+    "images": {
+        "empyrion-png: {
+            "source": "Empyrion.exe"
+        , "joystick-png": {
+            "source": "https://www.pngaaa.com/detail/5639857"
+        }
+    }
+}

@@ -1,14 +1,14 @@
 #Include %A_ScriptDir%\Inputs\CInput.class.ahk
-#Include %A_ScriptDir%\Inputs\CPseudoInputAxis.class.ahk
-#Include %A_ScriptDir%\Inputs\CRealInputAxis.class.ahk
+#Include %A_ScriptDir%\Inputs\CInputPseudoAxis.class.ahk
+#Include %A_ScriptDir%\Inputs\CInputRealAxis.class.ahk
 
 class CInputAxis extends CInput {
-	isInverted := false
+    isInverted := false
 
-	__New( inputString ) {
-		if ( ! InStr( inputString, "," ) )
-			return New CRealInputAxis( inputString )
-		else
-			return := New CPseudoInputAxis( inputString )
-		}
-	}
+    __New( inputString ) {
+        if ( InStr( inputString, " " ) )
+            return := New CInputPseudoAxis( inputString )
+        else
+            return New CInputRealAxis( inputString )
+        }
+    }
